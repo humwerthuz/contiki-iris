@@ -50,6 +50,7 @@
 #include "dev/rs232.h"
 #include "dev/watchdog.h"
 #include "dev/slip.h"
+#include "dev/serial-line.h"
 
 #include "init-net.h"
 #include "dev/ds2401.h"
@@ -106,6 +107,11 @@ main(void)
   
   init_net();
   
+#if !WITH_UIP && !WITH_UIP6
+  rs232_set_input(RS232_PORT_0, serial_line_input_byte);
+  serial_line_init();
+#endif
+
   printf_P(PSTR(CONTIKI_VERSION_STRING " started. Node id %u\n"), node_id);
 
   leds_off(LEDS_ALL);
