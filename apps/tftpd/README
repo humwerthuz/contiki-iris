@@ -1,0 +1,55 @@
+TFTP Server
+-----------
+
+A simple TFTP server for Contiki. Features:
+
+- IPv4 and IPv6
+- one client only
+- octet mode only
+- uses cfs to store files
+- supports blksize, timeout options
+- experimental file execution via exec=1 option
+- proper error handling
+
+Please note, that you need a TFTP client which supports setting the blksize
+option, as the protocol relies on the packets' sizes to detect the end of a
+transfer. The default packet size of 512 is often not suitable for sensor
+networks as the link layer packets are much smaller. A value of 60 bytes is safe
+in Contiki IPv6.
+
+Integration
+-----------
+
+The tftpd folder can be used as a Contiki application. Currently there is no
+mechanism to have multiple application directories, either the Makefile.include
+from Contiki can be adapted, or this folder can be copied to the Contiki source
+tree.
+
+A sample project Makefile should then include
+
+    APPS=tftpd
+
+To start the TFTP server from the project's code:
+
+    AUTOSTART_PROCESSES(..., &tftpd_process, ...);
+    // or
+    process_start(&tftpd_process);
+
+The util.{c,h} files include varios usefull makros and functions used to avoid
+printf calls, as this is increases code size by several kilobytes.
+
+Related RFCs
+------------
+
+- The TFTP Protocol:     http://tools.ietf.org/html/rfc1350
+- TFTP Option Extension: http://tools.ietf.org/html/rfc1350
+
+Known Bugs
+----------
+
+File system corruption occurred when repeatedly uploading a file under the same
+name with different sizes. We have not tracked this down yet however and it's
+not sure if this is a Coffe Bug.
+
+This file is written in
+[Markdown](http://daringfireball.net/projects/markdown/) Syntax.

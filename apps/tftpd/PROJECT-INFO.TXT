@@ -1,0 +1,11 @@
+Name: TFTP Server
+Contact: Gidon Ernst <gidon.ernst@googlemail.com>
+URL:
+License: GPL http://www.opensource.org/licenses/bsd-license.php
+Screenshot:
+Contiki version:
+Intended platforms: All
+Tested platforms: All
+Description:
+An application intended for easy remote access to the contiki file system.
+Contains (experimental) code to execute uploaded elf files via the elfloader.
