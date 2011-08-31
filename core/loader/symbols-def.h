@@ -33,9 +33,18 @@
 #ifndef __SYMBOLS_DEF_H__
 #define __SYMBOLS_DEF_H__
 
+#if 1
+#include <stdint.h>
+typedef uint32_t symbol_addr_t;
+#else
+typedef void * symbol_addr_t;
+#endif
+
+#define LONGNULL ((symbol_addr_t)NULL)
+
 struct symbols {
   const char *name;
-  void *value;
+  symbol_addr_t value;
 };
 
 extern const int symbols_nelts;

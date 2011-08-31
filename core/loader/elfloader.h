@@ -88,12 +88,12 @@
 #define ELFLOADER_BAD_ELF_HEADER      1
 /**
  * Return value from elfloader_load() indicating that no symbol table
- * could be found in the ELF file.
+ * could be find in the ELF file.
  */
 #define ELFLOADER_NO_SYMTAB           2
 /**
  * Return value from elfloader_load() indicating that no string table
- * could be found in the ELF file.
+ * could be find in the ELF file.
  */
 #define ELFLOADER_NO_STRTAB           3
 /**
@@ -119,11 +119,21 @@
  * point could be found in the loaded module.
  */
 #define ELFLOADER_NO_STARTPOINT       7
+/**
+ * Return value from elfloader_load() indicating that no slot is
+ * available.
+ */
+#define ELFLOADER_NO_SLOT             8
+/**
+ * Return value from elfloader_load() indicating that no text or data
+ * memory could be allocated.
+ */
+#define ELFLOADER_ALLOCATE_ERROR      9
 
 /**
  * elfloader initialization function.
  *
- * This function should be called at boot up to initialize the elfloader.
+ * This function should be called at boot up to initilize the elfloader.
  */
 void elfloader_init(void);
 

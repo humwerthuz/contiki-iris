@@ -38,7 +38,13 @@
 #include "dev/rs232.h"
 #include "elfloader-arch.h"
 #include "lib/mmem.h"
-#include <string.h> //memset
+#include "symbols-def.h"
+
+//#ifdef __AVR_ATmega1284P__
+//#if 1
+//#undef SPM_PAGESIZE 
+//#define SPM_PAGESIZE 256
+//#endif 
 
 #define R_AVR_NONE             0
 #define R_AVR_32               1
@@ -72,7 +78,7 @@
 
 static struct mmem module_heap;
 /*---------------------------------------------------------------------------*/
-void*
+symbol_addr_t
 elfloader_arch_allocate_ram(int size)
 {
   /* Free previously allocated memory */
@@ -83,41 +89,81 @@ elfloader_arch_allocate_ram(int size)
   
   /* Allocate RAM for module */
   if (mmem_alloc (&module_heap, size) ==  0) {
-    return NULL;
+    return LONGNULL;
   }
   
-  return (char*)MMEM_PTR(&module_heap);
+  return (symbol_addr_t)MMEM_PTR(&module_heap);
 }
 
 /*---------------------------------------------------------------------------*/
 /* TODO: Currently, modules are written to the fixed address 0x10000. Since
  *        flash rom uses word addresses on the AVR, we return 0x8000 here
  */
-void*
+symbol_addr_t
 elfloader_arch_allocate_rom(int size)
 {
-  return (void *)0x8000;
+  //return (void *)0xa000;
+  return 0x8000;
 }
 
 /*---------------------------------------------------------------------------*/
 /* Eliminate compiler warnings for (non-functional) code when flash requires 32 bit addresses and pointers are 16 bit */
 #define INCLUDE_APPLICATE_SOURCE 1
 #ifdef __GNUC__
-#if (FLASHEND > USHRT_MAX) && (__SIZEOF_POINTER__ <= 2)
-#undef INCLUDE_APPLICATE_SOURCE
-#define INCLUDE_APPLICATE_SOURCE 0
-#endif
+//#if (FLASHEND > USHRT_MAX) && (__SIZEOF_POINTER__ <= 2)
+//#undef INCLUDE_APPLICATE_SOURCE
+//#define INCLUDE_APPLICATE_SOURCE 0
+//#endif
 #if (__SIZEOF_POINTER__ > 2)
 #define INCLUDE_32BIT_CODE 1
 #endif
 #endif
 #if INCLUDE_APPLICATE_SOURCE
 
+BOOTLOADER_SECTION static inline void boot_program_page (uint32_t page, uint8_t *buf)
+{
+  uint16_t i;
+  uint8_t sreg;
+
+  // Disable interrupts.
+
+  sreg = SREG;
+  cli();
+
+    eeprom_busy_wait ();
+
+    boot_page_erase (page);
+    boot_spm_busy_wait ();      // Wait until the memory is erased.
+
+    for (i=0; i<SPM_PAGESIZE; i+=2)
+    {
+        // Set up little-endian word.
+
+        uint16_t w = *buf++;
+        w += (*buf++) << 8;
+    
+        boot_page_fill (page + i, w);
+    }
+
+    boot_page_write (page);     // Store buffer in flash page.
+    boot_spm_busy_wait();       // Wait until the memory is written.
+
+    // Reenable RWW-section again. We need this if we want to jump back
+    // to the application after bootloading.
+
+    boot_rww_enable ();
+
+    // Re-enable interrupts (if they were ever enabled).
+
+    SREG = sreg;
+}
+
 BOOTLOADER_SECTION void
-elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, char *mem)
+elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, symbol_addr_t mem)
 {
     unsigned char   buf[SPM_PAGESIZE];
-    unsigned short* flashptr = (unsigned short *) mem;
+	symbol_addr_t origptr = mem;
+	symbol_addr_t flashptr;
 
 
     // Sanity-check size of loadable module
@@ -128,11 +174,12 @@ elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, char
     // Seek to patched module and burn it to flash (in chunks of
     // size SPM_PAGESIZE, i.e. 256 bytes on the ATmega128)
     cfs_seek(fd, textoff, CFS_SEEK_SET);
-    for (flashptr=(unsigned short *)mem; flashptr < (unsigned short *) mem + size; flashptr += SPM_PAGESIZE) {
+    for (flashptr=mem; flashptr < mem + size; flashptr += SPM_PAGESIZE) {
 	memset (buf, 0, SPM_PAGESIZE);
 	cfs_read(fd, buf, SPM_PAGESIZE);
+	boot_program_page(flashptr, (uint8_t *)buf);
 
-	// Disable interrupts
+	/*// Disable interrupts
 	uint8_t sreg;
 	sreg = SREG;
 	cli ();
@@ -160,7 +207,7 @@ elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, char
 	boot_spm_busy_wait ();	
 
 	// Restore original interrupt settings
-	SREG = sreg;
+	SREG = sreg;*/
     }
 }
 #endif /* INCLUDE_APPLICATE_SOURCE */
@@ -177,8 +224,8 @@ write_ldi(int fd, unsigned char *instr, unsigned char byte)
 void
 elfloader_arch_relocate(int fd, unsigned int sectionoffset,
 	//			struct elf32_rela *rela, elf32_addr addr)
-			char *sectionaddr,
-			struct elf32_rela *rela, char *addr)
+			symbol_addr_t sectionaddr,
+			struct elf32_rela *rela, symbol_addr_t addr)
 {
   unsigned int type;
   unsigned char instr[4];
@@ -204,7 +251,7 @@ elfloader_arch_relocate(int fd, unsigned int sectionoffset,
      * Do not use >> 1 for division because branch instructions use
      * signed offsets.
      */
-    int16_t a = (((int)addr - rela->r_offset -2) / 2);
+    int16_t a = (((int)(addr-sectionaddr) - rela->r_offset -2) / 2);
     instr[0] |= (a << 3) & 0xf8;
     instr[1] |= (a >> 5) & 0x03;
     cfs_write(fd, instr, 2);
@@ -215,7 +262,7 @@ elfloader_arch_relocate(int fd, unsigned int sectionoffset,
      * Relocation is relative to PC. -2: RJMP adds 2 to PC.
      * Do not use >> 1 for division because RJMP uses signed offsets.
      */
-    int16_t a = (int)addr / 2;
+    int16_t a = (int)(addr - sectionaddr) / 2;
     a -= rela->r_offset / 2;
     a--;
     instr[0] |= a & 0xff;
@@ -232,8 +279,8 @@ elfloader_arch_relocate(int fd, unsigned int sectionoffset,
     break;
 
   case R_AVR_16_PM: /* 5 */
-    addr = (char *)((int)addr >> 1);
-    instr[0] = (int)addr  & 0xff;
+    addr = (symbol_addr_t) ((unsigned long)addr >> 1); // long because could potentially be longer than int here
+    instr[0] = (int)addr  & 0xff; // here it has to be shorter than int, because it's a word address now
     instr[1] = ((int)addr >> 8) & 0xff;
 
     cfs_write(fd, instr, 2);
@@ -253,17 +300,17 @@ elfloader_arch_relocate(int fd, unsigned int sectionoffset,
 #endif
 
   case R_AVR_LO8_LDI_NEG: /* 9 */
-    addr = (char *) (0 - (int)addr);
+    addr = (symbol_addr_t) (0 - (int)addr);
     write_ldi(fd, instr, (int)addr);
     break;
   case R_AVR_HI8_LDI_NEG: /* 10 */
-    addr = (char *) (0 - (int)addr);
+    addr = (symbol_addr_t) (0 - (int)addr);
     write_ldi(fd, instr, (int)addr >> 8);
     break;
     
 #if INCLUDE_32BIT_CODE         /* 32 bit AVRs */
   case R_AVR_HH8_LDI_NEG: /* 11 */
-    addr = (char *)(0 - (int)addr);
+    addr = (symbol_addr_t)(0 - (int)addr);
     write_ldi(fd, instr, (int)addr >> 16);
     break;
 #endif
@@ -282,17 +329,17 @@ elfloader_arch_relocate(int fd, unsigned int sectionoffset,
 #endif
 
   case R_AVR_LO8_LDI_PM_NEG: /* 15 */
-    addr = (char *) (0 - (int)addr);
+    addr = (symbol_addr_t) (0 - (int)addr);
     write_ldi(fd, instr, (int)addr >> 1);
     break;
   case R_AVR_HI8_LDI_PM_NEG: /* 16 */
-    addr = (char *) (0 - (int)addr);
+    addr = (symbol_addr_t) (0 - (int)addr);
     write_ldi(fd, instr, (int)addr >> 9);
     break;
     
 #if INCLUDE_32BIT_CODE         /* 32 bit AVRs */
   case R_AVR_HH8_LDI_PM_NEG: /* 17 */
-    addr = (char *) (0 - (int)addr);
+    addr = (symbol_addr_t) (0 - (int)addr);
     write_ldi(fd, instr, (int)addr >> 17);
     break;
 #endif
@@ -305,8 +352,9 @@ elfloader_arch_relocate(int fd, unsigned int sectionoffset,
 	*/
 
 	/* new solution */
+    addr = (symbol_addr_t) ((unsigned long)addr >> 1);
     instr[2] = (u8_t) ((int)addr) & 0xff;
-    instr[3] = ((int)addr) >> 8;
+    instr[3] = (u8_t) ((int)addr >> 8) & 0xff;
     cfs_write(fd, instr, 4);
     break;
 

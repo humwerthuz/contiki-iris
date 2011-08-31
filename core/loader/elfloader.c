@@ -43,7 +43,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -129,13 +129,12 @@ struct elf32_sym {
 struct relevant_section {
   unsigned char number;
   unsigned int offset;
-  char *address;
+  symbol_addr_t address;
 };
 
 char elfloader_unknown[30];	/* Name that caused link error. */
 
 struct process * const * elfloader_autostart_processes;
-
 static struct relevant_section bss, data, rodata, text;
 
 static const unsigned char elf_magic_header[] =
@@ -173,47 +172,51 @@ seek_write(int fd, unsigned int offset, char *buf, int len)
 }
 */
 /*---------------------------------------------------------------------------*/
-static void *
+static symbol_addr_t
 find_local_symbol(int fd, const char *symbol,
-		  unsigned int symtab, unsigned short symtabsize,
-		  unsigned int strtab)
+		unsigned int symtab, unsigned short symtabsize,
+		unsigned int strtab)
 {
   struct elf32_sym s;
   unsigned int a;
   char name[30];
   struct relevant_section *sect;
   
+//PRINTF("find_local_symbol  %s\n", symbol);
   for(a = symtab; a < symtab + symtabsize; a += sizeof(s)) {
     seek_read(fd, a, (char *)&s, sizeof(s));
 
+    //if(s.st_name != LONGNULL) {
     if(s.st_name != 0) {
       seek_read(fd, strtab + s.st_name, name, sizeof(name));
       if(strcmp(name, symbol) == 0) {
-	if(s.st_shndx == bss.number) {
-	  sect = &bss;
-	} else if(s.st_shndx == data.number) {
-	  sect = &data;
-	} else if(s.st_shndx == text.number) {
-	  sect = &text;
-	} else {
-	  return NULL;
-	}
-	return &(sect->address[s.st_value]);
+	    if(s.st_shndx == bss.number) {
+    	  sect = &bss;
+    	} else if(s.st_shndx == data.number) {
+    	  sect = &data;
+    	} else if(s.st_shndx == text.number) {
+    	  sect = &text;
+    	} else if(s.st_shndx == rodata.number) {
+    	  sect = &rodata;
+        } else {
+          return LONGNULL;
+        }
+        return sect->address + s.st_value;
       }
     }
   }
-  return NULL;
+  return LONGNULL;
 }
 /*---------------------------------------------------------------------------*/
 static int
 relocate_section(int fd,
-		 unsigned int section, unsigned short size,
-		 unsigned int sectionaddr,
-		 char *sectionbase,
-		 unsigned int strs,
-		 unsigned int strtab,
-		 unsigned int symtab, unsigned short symtabsize,
-		 unsigned char using_relas)
+		unsigned int section, unsigned short size,
+		unsigned int sectionaddr,
+		symbol_addr_t sectionbase,
+		unsigned int strs,
+		unsigned int strtab,
+		unsigned int symtab, unsigned short symtabsize,
+		unsigned char using_relas)
 {
   /* sectionbase added; runtime start address of current section */
   struct elf32_rela rela; /* Now used both for rel and rela data! */
@@ -221,7 +224,7 @@ relocate_section(int fd,
   struct elf32_sym s;
   unsigned int a;
   char name[30];
-  char *addr;
+  symbol_addr_t addr;
   struct relevant_section *sect;
 
   /* determine correct relocation entry sizes */
@@ -239,14 +242,14 @@ relocate_section(int fd,
     if(s.st_name != 0) {
       seek_read(fd, strtab + s.st_name, name, sizeof(name));
       PRINTF("name: %s\n", name);
-      addr = (char *)symtab_lookup(name);
+      addr = (symbol_addr_t)symtab_lookup(name);
       /* ADDED */
-      if(addr == NULL) {
+      if(addr == LONGNULL) {
 	PRINTF("name not found in global: %s\n", name);
 	addr = find_local_symbol(fd, name, symtab, symtabsize, strtab);
-	PRINTF("found address %p\n", addr);
+	PRINTF("found address %p\n", (void*)addr);
       }
-      if(addr == NULL) {
+      if(addr == LONGNULL) {
 	if(s.st_shndx == bss.number) {
 	  sect = &bss;
 	} else if(s.st_shndx == data.number) {
@@ -290,6 +293,7 @@ relocate_section(int fd,
 }
 /*---------------------------------------------------------------------------*/
 static void *
+//static symbol_addr_t
 find_program_processes(int fd,
 		       unsigned int symtab, unsigned short size,
 		       unsigned int strtab)
@@ -302,12 +306,15 @@ find_program_processes(int fd,
     seek_read(fd, a, (char *)&s, sizeof(s));
 
     if(s.st_name != 0) {
+    //if(s.st_name != LONGNULL) {
       seek_read(fd, strtab + s.st_name, name, sizeof(name));
       if(strcmp(name, "autostart_processes") == 0) {
-	return &data.address[s.st_value];
+	//return data.address + s.st_value;
+	return (void*)data.address + s.st_value;
       }
     }
   }
+  //return LONGNULL;
   return NULL;
 /*   return find_local_symbol(fd, "autostart_processes", symtab, size, strtab); */
 }
@@ -503,14 +510,18 @@ elfloader_load(int fd)
     return ELFLOADER_NO_TEXT;
   }
 
-  PRINTF("before allocate ram\n");
-  bss.address = (char *)elfloader_arch_allocate_ram(bsssize + datasize);
-  data.address = (char *)bss.address + bsssize;
-  PRINTF("before allocate rom\n");
-  text.address = (char *)elfloader_arch_allocate_rom(textsize + rodatasize);
-  rodata.address = (char *)text.address + textsize;
+  PRINTF("before allocate ram\r\n");
+  bss.address = (symbol_addr_t)elfloader_arch_allocate_ram(bsssize + datasize);
+  data.address = (symbol_addr_t)bss.address + bsssize;
+  PRINTF("before allocate rom\r\n");
+  text.address = (symbol_addr_t)elfloader_arch_allocate_rom(textsize + rodatasize);
+  rodata.address = (symbol_addr_t)text.address + textsize;
   
-
+  if(bss.address == LONGNULL || text.address == LONGNULL) {
+  	return ELFLOADER_ALLOCATE_ERROR;
+  }
+  
+  
   PRINTF("bss base address: bss.address = 0x%08x\n", bss.address);
   PRINTF("data base address: data.address = 0x%08x\n", data.address);
   PRINTF("text base address: text.address = 0x%08x\n", text.address);
@@ -568,8 +579,8 @@ elfloader_load(int fd)
   elfloader_arch_write_rom(fd, textoff, textsize, text.address);
   elfloader_arch_write_rom(fd, rodataoff, rodatasize, rodata.address);
   
-  memset(bss.address, 0, bsssize);
-  seek_read(fd, dataoff, data.address, datasize);
+  memset((char*)bss.address, 0, bsssize);
+  seek_read(fd, dataoff, (char*)data.address, datasize);
 
   PRINTF("elfloader: autostart search\n");
   process = (struct process **) find_local_symbol(fd, "autostart_processes", symtaboff, symtabsize, strtaboff);

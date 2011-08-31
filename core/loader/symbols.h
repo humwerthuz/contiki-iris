@@ -32,14 +32,15 @@
  */
 #ifndef __SYMBOLS_H__
 #define __SYMBOLS_H__
+#include "symbols-def.h"
 
-struct symbols {
-  const char *name;
-  void *value;
-};
-
-extern const int symbols_nelts;
-
-extern const struct symbols symbols[/* symbols_nelts */];
+//struct symbols {
+//  const char *name;
+//  void *value;
+//};
+//
+//extern const int symbols_nelts;
+//
+//extern const struct symbols symbols[/* symbols_nelts */];
 
 #endif /* __SYMBOLS_H__ */

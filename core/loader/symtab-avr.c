@@ -36,6 +36,7 @@
 #include <avr/pgmspace.h>
 #include "symtab.h"
 #include "loader/symbols.h"
+#include "loader/symbols-def.h"
 
 #define SYMTAB_CONF_BINARY_SEARCH 0
 
@@ -47,7 +48,7 @@ symtab_lookup(const char *name)
   void* name_addr;
 
   for(name_addr = (void*)pgm_read_word(&symbols[0].name);
-      name_addr != NULL;
+      name_addr != LONGNULL;
       name_addr = (void*)pgm_read_word(&symbols[++i].name)) {
 
     if(strcmp_P (name, (const char*)name_addr) == 0) {
@@ -59,7 +60,7 @@ symtab_lookup(const char *name)
 
 /*---------------------------------------------------------------------------*/
 
-#if 0
+#if 1
 #define SYMTAB_PRINT_BUFFER_SIZE 30
 void
 symtab_print (void)
@@ -69,13 +70,13 @@ symtab_print (void)
   char buf[SYMTAB_PRINT_BUFFER_SIZE];
 
   for(name_addr = (const char*)pgm_read_word(&symbols[0].name);
-      name_addr != NULL;
+      name_addr != LONGNULL;
       name_addr = pgm_read_word(&symbols[++i].name)) {
 
     strncpy_P (buf, (const char*)name_addr, SYMTAB_PRINT_BUFFER_SIZE);
     buf [SYMTAB_PRINT_BUFFER_SIZE - 1] = '\0';
     uint16_t value = pgm_read_word(&symbols[i].value);
-    printf ("%s -> 0x%x\n", buf, value);
+    printf ("%d %s -> 0x%x\n", i, buf, value);
   }
 }
 #endif

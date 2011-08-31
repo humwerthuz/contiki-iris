@@ -66,7 +66,8 @@
 #ifndef __ELFLOADER_ARCH_H__
 #define __ELFLOADER_ARCH_H__
 
-#include "loader/elfloader.h"
+#include "elfloader.h"
+#include "symbols-def.h"
 
 /**
  * \brief      Allocate RAM for a new module.
@@ -80,7 +81,7 @@
  *             mechanism for deallocating the memory allocated with
  *             this function.
  */
-void *elfloader_arch_allocate_ram(int size);
+symbol_addr_t elfloader_arch_allocate_ram(int size);
 
 /**
  * \brief      Allocate program memory for a new module.
@@ -95,7 +96,7 @@ void *elfloader_arch_allocate_ram(int size);
  *             mechanism for deallocating the memory allocated with
  *             this function.
  */
-void *elfloader_arch_allocate_rom(int size);
+symbol_addr_t elfloader_arch_allocate_rom(int size);
 
 /**
  * \brief      Perform a relocation.
@@ -117,8 +118,8 @@ void *elfloader_arch_allocate_rom(int size);
  *             processor.
  */
 void elfloader_arch_relocate(int fd, unsigned int sectionoffset,
-			     char *sectionaddr,
-			     struct elf32_rela *rela, char *addr);
+			     symbol_addr_t sectionaddr,
+			     struct elf32_rela *rela, symbol_addr_t addr);
 
 /**
  * \brief      Write to read-only memory (for example the text segment).
@@ -132,7 +133,7 @@ void elfloader_arch_relocate(int fd, unsigned int sectionoffset,
  *             module into memory. The function is called when all
  *             relocations have been performed.
  */
-void elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, char *mem);
+void elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, symbol_addr_t mem);
 
 #endif /* __ELFLOADER_ARCH_H__ */
 
