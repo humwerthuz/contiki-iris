@@ -490,6 +490,7 @@ find_file(const char *name)
   
   /* Scan the flash memory sequentially otherwise. */
   for(page = 0; page < COFFEE_PAGE_COUNT; page = next_file(page, &hdr)) {
+      PRINTF("\nfind_file: read_header(%d)", page);
     read_header(&hdr, page);
     if(HDR_ACTIVE(hdr) && !HDR_LOG(hdr) && strcmp(name, hdr.name) == 0) {
       return load_file(page, &hdr);
@@ -541,6 +542,7 @@ find_contiguous_pages(coffee_page_t amount)
 
   start = INVALID_PAGE;
   for(page = *next_free; page < COFFEE_PAGE_COUNT;) {
+      PRINTF("\nfind_contiguous_pages: read_header(%d)", page);
     read_header(&hdr, page);
     if(HDR_FREE(hdr)) {
       if(start == INVALID_PAGE) {
@@ -1340,12 +1342,15 @@ cfs_coffee_format(void)
   unsigned i;
 
   PRINTF("Coffee: Formatting %u sectors", COFFEE_SECTOR_COUNT);
+  PRINTF("\ncfs_flash_erase = %p", avr_flash_erase);
+  PRINTF("\ncfs_flash_erase = %p", avr_flash_write);
 
   *next_free = 0;
 
   for(i = 0; i < COFFEE_SECTOR_COUNT; i++) {
+  PRINTF("\nFormat sector %u", i);
     COFFEE_ERASE(i);
-    PRINTF(".");
+    PRINTF("!");
   }
 
   /* Formatting invalidates the file information. */

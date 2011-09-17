@@ -103,7 +103,7 @@ symbol_addr_t
 elfloader_arch_allocate_rom(int size)
 {
   //return (void *)0xa000;
-  return 0x8000;
+  return 0x9000;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -164,6 +164,7 @@ elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, symb
     unsigned char   buf[SPM_PAGESIZE];
 	symbol_addr_t origptr = mem;
 	symbol_addr_t flashptr;
+    unsigned int i;
 
 
     // Sanity-check size of loadable module
@@ -177,6 +178,10 @@ elfloader_arch_write_rom(int fd, unsigned short textoff, unsigned int size, symb
     for (flashptr=mem; flashptr < mem + size; flashptr += SPM_PAGESIZE) {
 	memset (buf, 0, SPM_PAGESIZE);
 	cfs_read(fd, buf, SPM_PAGESIZE);
+    for (i = 0; i < SPM_PAGESIZE; ++i) {
+      PRINTF("%02x ", buf[i]);
+    }
+    PRINTF("\n");
 	boot_program_page(flashptr, (uint8_t *)buf);
 
 	/*// Disable interrupts
@@ -235,6 +240,7 @@ elfloader_arch_relocate(int fd, unsigned int sectionoffset,
   cfs_seek(fd, sectionoffset + rela->r_offset, CFS_SEEK_SET);
   
   type = ELF32_R_TYPE(rela->r_info);
+  PRINTF("type = %d\n", type);
 
   addr += rela->r_addend;
 

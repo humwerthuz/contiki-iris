@@ -33,7 +33,7 @@
 #ifndef __SYMBOLS_DEF_H__
 #define __SYMBOLS_DEF_H__
 
-#if 1
+#if __AVR__
 #include <stdint.h>
 typedef uint32_t symbol_addr_t;
 #else

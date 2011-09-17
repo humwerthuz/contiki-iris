@@ -45,6 +45,7 @@
 #include <string.h>
 
 #include "cfs-coffee-arch.h"
+#include "loader/elfloader-avr.c"
 
 #define DEBUG 0
 #if DEBUG

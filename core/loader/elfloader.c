@@ -292,8 +292,8 @@ relocate_section(int fd,
   return ELFLOADER_OK;
 }
 /*---------------------------------------------------------------------------*/
-static void *
-//static symbol_addr_t
+//static void *
+static symbol_addr_t
 find_program_processes(int fd,
 		       unsigned int symtab, unsigned short size,
 		       unsigned int strtab)
@@ -305,17 +305,18 @@ find_program_processes(int fd,
   for(a = symtab; a < symtab + size; a += sizeof(s)) {
     seek_read(fd, a, (char *)&s, sizeof(s));
 
-    if(s.st_name != 0) {
-    //if(s.st_name != LONGNULL) {
+    //if(s.st_name != 0) {
+    if(s.st_name != LONGNULL) {
       seek_read(fd, strtab + s.st_name, name, sizeof(name));
+      printf("%s\n", name);
       if(strcmp(name, "autostart_processes") == 0) {
-	//return data.address + s.st_value;
-	return (void*)data.address + s.st_value;
+	return data.address + s.st_value;
+	//return (void*)data.address + s.st_value;
       }
     }
   }
-  //return LONGNULL;
-  return NULL;
+  return LONGNULL;
+  //return NULL;
 /*   return find_local_symbol(fd, "autostart_processes", symtab, size, strtab); */
 }
 /*---------------------------------------------------------------------------*/

@@ -4,10 +4,14 @@ CONTIKI_TARGET_MAIN = ${CONTIKI_CORE}.o
 
 SENSOR_BOARD_SOURCEFILES = mts300.c
 
-CONTIKI_TARGET_SOURCEFILES += adc.c rs232.c cfs-eeprom.c contiki-iris-main.c \
+#CONTIKI_TARGET_SOURCEFILES += adc.c rs232.c cfs-eeprom.c contiki-iris-main.c 
+#CONTIKI_TARGET_SOURCEFILES += adc.c rs232.c cfs-coffee.c cfs-coffee-arch.c contiki-iris-main.c 
+CONTIKI_TARGET_SOURCEFILES += adc.c rs232.c contiki-iris-main.c \
                               leds-arch.c init-net.c node-id.c \
                               clock.c spi.c rtimer-arch.c ds2401.c \
                               battery-sensor.c slip.c slip_uart0.c
+
+BOOTLOADER_START=0x1E000
 
 CONTIKI_TARGET_SOURCEFILES += $(SENSOR_BOARD_SOURCEFILES)
 
@@ -22,6 +26,13 @@ AVRDUDE_OPTIONS=-V
 AVRDUDE_PROGRAMMER=mib510
 #AVRDUDE_PROGRAMMER=jtag2
 #AVRDUDE_PORT=usb
+ifeq ($(PORT), )
+  ifndef WINDIR
+    PORT = /dev/ttyUSB0 
+  else
+    PORT = COM1
+  endif
+endif
 AVRDUDE_PORT=$(PORT)
 
 include $(CONTIKIAVR)/Makefile.avr
@@ -30,7 +41,11 @@ include $(CONTIKIAVR)/Makefile.avr
 %.od: %.$(TARGET)
 	avr-objdump -zhD $< > $@
 
+%.run: %.out
+	avarice -2 --jtag usb --erase --program --file $< :4242
 
+%.gdb: %.out
+	avr-gdb $< -x ~/work/contiki/gdb.init
 ifndef WINDIR
   ifdef OS
     ifneq (,$(findstring Windows,$(OS)))
@@ -43,13 +58,6 @@ ifeq ($(PRGBOARD), )
   PRGBOARD = mib510
 endif
 
-ifeq ($(PORT), )
-  ifndef WINDIR
-    PORT = /dev/ttyUSB0 
-  else
-    PORT = COM1
-  endif
-endif
 
 PRGBOARD_FILE = $(CONTIKI)/platform/$(TARGET)/buildscripts/Makefile.$(PRGBOARD)
 HAVE_PRGBOARD_FILE = $(wildcard $(PRGBOARD_FILE))
