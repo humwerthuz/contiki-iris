@@ -43,7 +43,7 @@
 #include "net/rpl/rpl.h"
 
 #include "net/netstack.h"
-#include "dev/button-sensor.h"
+//#include "dev/button-sensor.h"
 #include "dev/slip.h"
 
 /* For internal webserver Makefile must set APPS += webserver and PROJECT_SOURCEFILES += httpd-simple.c */
@@ -216,7 +216,7 @@ PROCESS_THREAD(border_router_process, ev, data)
   process_start(&webserver_nogui_process, NULL);
 #endif
 
-  SENSORS_ACTIVATE(button_sensor);
+  //SENSORS_ACTIVATE(button_sensor);
 
   PRINTF("RPL-Border router started\n");
 
@@ -241,11 +241,15 @@ PROCESS_THREAD(border_router_process, ev, data)
      packet reception rates. */
   NETSTACK_MAC.off(1);
 
+  static struct etimer t;
+  etimer_set(&t, 10*CLOCK_SECOND);
   while(1) {
     PROCESS_YIELD();
-    if (ev == sensors_event && data == &button_sensor) {
+    //if (ev == sensors_event && data == &button_sensor) {
+    if (etimer_expired(&t)) {
       PRINTF("Initiating global repair\n");
       rpl_repair_dag(rpl_get_dag(RPL_ANY_INSTANCE));
+      etimer_reset(&t);
     }
   }
 
