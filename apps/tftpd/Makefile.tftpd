@@ -1,6 +1,0 @@
-ifeq ($(TFTPD_CONF_EXEC),1)
-    CFLAGS+=-DWITH_EXEC=1
-endif
-
-tftpd_src = tftpd.c util.c
-
